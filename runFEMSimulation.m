@@ -34,9 +34,16 @@ function runFEMSimulation(meshFile, dt)
     M = assembleMass(mesh, feMap);
     K = assembleDiffusion(mesh, feMap, diffusivity);
 
+    % Precompute the IMEX scheme matrices
+    A = M + dt * K;
+
+    % Check if A is an M-matrix (efficiently)
+    diagA = spdiags(A, 0);
+    offDiagA = A - spdiags(diagA, 0, size(A, 1), size(A, 2));
+    isMMatrix = all(diagA > 0) && nnz(offDiagA > 0) == 0;
+
     % Time integration loop
-    activationTimes = zeros(mesh.numVertices, 1);
-    activationTimes(:) = Inf; % Set initial activation times to infinity
+    activationTimes = Inf(mesh.numVertices, 1); % Set initial activation times to infinity
 
     for n = 1:numSteps
         % Reaction term
@@ -46,19 +53,19 @@ function runFEMSimulation(meshFile, dt)
         rhs = M * u - dt * f;
 
         % Solve the linear system
-        A = M + dt * K;
         u = A \ rhs;
 
         % Check activation time
         newlyActivated = (u > ft) & (activationTimes == Inf);
         activationTimes(newlyActivated) = n * dt;
+
+        % Ensure potential remains within bounds
+        u(u < 0) = 0;
+        u(u > 1) = 1;
     end
 
     % Plot the final solution
     mesh.plotSolution(u);
-
-    % Check if the matrix is an M-matrix
-    isMMatrix = all(all(A <= 0 | (diag(A) > 0)));
 
     % Check if the potential remains between 0 and 1
     potentialValid = all(u >= 0 & u <= 1);

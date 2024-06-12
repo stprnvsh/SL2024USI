@@ -1,4 +1,8 @@
 function mesh = readMesh_msh(file_name)
+    if ~isfile(file_name)
+        error('File %s not found', file_name);
+    end
+
     commandString = ['head -n1 ', file_name, ' > temp.txt'];
     system(commandString);
     data = load('temp.txt');
@@ -30,8 +34,6 @@ function mesh = readMesh_msh(file_name)
     mesh.elements = data(:, 1:3)';
     mesh.elements_flag = data(:, 4);
 
-    !rm temp.txt
-    !rm temp2.txt
-
-    return
+    delete('temp.txt');
+    delete('temp2.txt');
 end

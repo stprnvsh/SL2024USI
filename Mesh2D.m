@@ -27,13 +27,18 @@ classdef Mesh2D < handle
         end
 
         function plotMesh(obj)
-            close all
-            trimesh(obj.meshElements', obj.vertices(1, :), obj.vertices(2, :));
-            axis equal
+            figure;
+            trimesh(obj.meshElements', obj.vertices(1, :), obj.vertices(2, :), 'Color', 'k');
+            axis equal;
+            title('Mesh');
         end
 
         function plotSolution(obj, solution)
-            trimesh(obj.meshElements', obj.vertices(1, :), obj.vertices(2, :), solution);
+            figure;
+            trisurf(obj.meshElements', obj.vertices(1, :), obj.vertices(2, :), solution, 'EdgeColor', 'none');
+            colorbar;
+            axis equal;
+            title('Solution');
         end
     end
 end
