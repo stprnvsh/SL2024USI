@@ -20,96 +20,88 @@ function runFEMSimulation(meshFile, dt)
 
     % Plot the initial conditions
     figure;
-    subplot(1, 3, 1);
+    subplot(1, 2, 1);
     mesh.plotSolution(u0);
     title('Initial Condition');
 
     % Time-stepping
     u = u0;
     numSteps = ceil(Tf / dt);
+    
+    figure;
+    subplot(1, 3, 1);
+    mesh.plotSolution(u0);
+    title('Initial Condition');
 
     % Diffusivity for each element
     Sigma_d = [10 * Sigma_h, Sigma_h, 0.1 * Sigma_h, Sigma_h]; % for different regions
     diffusivity = Sigma_h * ones(mesh.numMeshElements, 1);
-    diffusivity(mesh.meshElementFlags == 0) = Sigma_d(1);
-    diffusivity(mesh.meshElementFlags == 1) = Sigma_d(2);
-    diffusivity(mesh.meshElementFlags == 2) = Sigma_d(3);
-    diffusivity(mesh.meshElementFlags == 3) = Sigma_d(4);
+    diffusivity(mesh.meshElementFlags == 0) = Sigma_d(1); % Omega_d1
+    diffusivity(mesh.meshElementFlags == 1) = Sigma_d(2); % Omega_d2
+    diffusivity(mesh.meshElementFlags == 2) = Sigma_d(3); % Omega_d3
+    diffusivity(mesh.meshElementFlags == 3) = Sigma_d(4); % Omega_h (healthy tissue)
 
-    % Plot the diffusivity setup
-    figure;
-    hold on;
-    colormap(jet(4));
-    for i = 1:mesh.numMeshElements
-        if mesh.meshElementFlags(i) == 0
-            color = 'r'; % Region 1
-        elseif mesh.meshElementFlags(i) == 1
-            color = 'g'; % Region 2
-        elseif mesh.meshElementFlags(i) == 2
-            color = 'b'; % Region 3
-        else
-            color = 'y'; % Healthy tissue
-        end
-        fill(mesh.vertices(1, mesh.meshElements(:, i)), mesh.vertices(2, mesh.meshElements(:, i)), color);
-    end
-    hold off;
-    title('Diffusivity Regions');
-    axis equal;
-    colorbar;
-    caxis([0, 3]);
-    legend('Region 1', 'Region 2', 'Region 3', 'Healthy tissue');
+    % Assemble stiffness matrix
+    K = assembleDiffusion(mesh, feMap, diffusivity); % Assembled once, used in A
 
-    % Assemble mass and stiffness matrices
-    M = assembleMass(mesh, feMap);
-    M_lumped = diag(sum(M, 2));
-    K = assembleDiffusion(mesh, feMap, diffusivity);
+    % Assemble mass matrix
+    M = assembleMass(mesh, feMap); % Assembled once, used in A
 
-    % Precompute the IMEX scheme matrices
-    A = M - dt * K;
-    A_lumped = M_lumped - dt * K;
-
-    % Check if A is an M-matrix (efficiently)
-    diagA = spdiags(A, 0);
-    offDiagA = A - spdiags(diagA, 0, size(A, 1), size(A, 2));
-    isMMatrix = all(diagA > 0) && nnz(offDiagA > 0) == 0;
-
+    % Precompute the IMEX scheme matrix
+    A = M + K*dt; % Precomputed matrix used in time-stepping loop
+    
     % Time integration loop
     activationTimes = Inf(mesh.numVertices, 1); % Set initial activation times to infinity
-
-    use_lumped_mass = false; % Flag to switch to lumped mass matrix
+    
+    % Initialize data storage
+    data = struct();
+    data.time = (0:numSteps) * dt;
+    data.u = zeros(mesh.numVertices, numSteps + 1);
+    data.u(:, 1) = u0;
 
     for n = 1:numSteps
-        % Reaction term
-        f = a * (u - fr) .* (u - ft) .* (u - fd);
-
+        % Nonlinear reaction term (explicit part)
+        f = a * (u - fr) .* (u - ft) .* (u - fd); % Updated each step
+        
         % Right-hand side
-        if use_lumped_mass
-            rhs = M_lumped * u - dt * f;
-        else
-            rhs = M * u - dt * f;
+        rhs = M * u - M * f * dt; % Computed using updated u and f
+        
+        % Solve the linear system (implicit part)
+        u_new = A \ rhs; % Solve using precomputed A
+        
+        % Ensure non-negativity and upper bound of the solution
+        u_new = max(min(u_new, 1), 0);
+        
+        % Check for NaN values
+        if any(isnan(u_new))
+            fprintf('NaN values detected at step %d\n', n);
+            break;
         end
 
-        % Solve the linear system
-        if use_lumped_mass
-            u = A_lumped \ rhs;
-        else
-            u = A \ rhs;
+        % Update u
+        u = u_new; % Updated each step
+        
+        % Plot intermediate solutions every 100 time steps
+        if mod(n, 10) == 0
+            mesh.plotSolution(u);
+            view(3)
+            title(['Solution at time step ', num2str(n)]);
+            drawnow;
         end
+
+        % Print intermediate values for debugging
+        fprintf('Step %d, max u: %e, min u: %e\n', n, max(u), min(u));
 
         % Check activation time
         newlyActivated = (u > ft) & (activationTimes == Inf);
         activationTimes(newlyActivated) = n * dt;
 
-        % Ensure potential remains within bounds
-       
-        % Check if potential exceeds bounds and switch to lumped mass matrix if needed
-        if any(u < 10^-10) || any(u > 1 + 10^-10)
-            use_lumped_mass = true;
-        end
+        % Store the solution
+        data.u(:, n + 1) = u;
     end
 
     % Plot the final solution
-    subplot(1, 3, 2);
+    subplot(1, 2, 2);
     mesh.plotSolution(u);
     title('Final Solution');
 
@@ -118,6 +110,11 @@ function runFEMSimulation(meshFile, dt)
 
     % Display results
     fprintf('Results for mesh %s with dt = %f\n', meshFile, dt);
-    fprintf('Is M-matrix: %d\n', isMMatrix);
+    fprintf('Activation times:\n');
+    disp(activationTimes');
     fprintf('Potential within [0, 1]: %d\n', potentialValid);
+
+    % Save the data to a .mat file
+    save('fem_simulation_data.mat', 'data');
 end
+
