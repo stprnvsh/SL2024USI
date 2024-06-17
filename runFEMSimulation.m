@@ -46,7 +46,7 @@ function runFEMSimulation(meshFile, dt)
 
     % Assemble mass matrix
     M = assembleMass(mesh, feMap); % Assembled once, used in A
-
+    %M = diag(sum(M,2))
     % Precompute the IMEX scheme matrix
     A = M + K*dt; % Precomputed matrix used in time-stepping loop
     
@@ -58,7 +58,14 @@ function runFEMSimulation(meshFile, dt)
     data.time = (0:numSteps) * dt;
     data.u = zeros(mesh.numVertices, numSteps + 1);
     data.u(:, 1) = u0;
-
+    
+   % Create a VideoWriter object for MP4 with dynamic filename
+    [~, meshName, ~] = fileparts(meshFile); % Extract the mesh name from the file path
+    videoFileName = sprintf('fem_simulation_%s_dt%f_without_diag.mp4', meshName, dt);
+    uDataFileName = sprintf('fem_simulation_%s_dt%f_simulation_data_without_diag.mat', meshName, dt);
+    v = VideoWriter(videoFileName, 'MPEG-4');
+    open(v);
+    
     for n = 1:numSteps
         % Nonlinear reaction term (explicit part)
         f = a * (u - fr) .* (u - ft) .* (u - fd); % Updated each step
@@ -87,6 +94,9 @@ function runFEMSimulation(meshFile, dt)
             view(3)
             title(['Solution at time step ', num2str(n)]);
             drawnow;
+            % Capture the frame for the video
+            frame = getframe(gcf);
+            writeVideo(v, frame);
         end
 
         % Print intermediate values for debugging
@@ -115,6 +125,9 @@ function runFEMSimulation(meshFile, dt)
     fprintf('Potential within [0, 1]: %d\n', potentialValid);
 
     % Save the data to a .mat file
-    save('fem_simulation_data.mat', 'data');
+    save(uDataFileName, 'data');
+    figure; % Play the movie at 10 frames per second
+    % Close the video file
+    close(v);
 end
 
