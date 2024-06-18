@@ -58,45 +58,47 @@ function runFEMSimulation(meshFile, dt)
     data.time = (0:numSteps) * dt;
     data.u = zeros(mesh.numVertices, numSteps + 1);
     data.u(:, 1) = u0;
+    data.vertices = mesh.vertices;
     
    % Create a VideoWriter object for MP4 with dynamic filename
     [~, meshName, ~] = fileparts(meshFile); % Extract the mesh name from the file path
-    videoFileName = sprintf('fem_simulation_%s_dt%f_without_diag.mp4', meshName, dt);
+    % videoFileName = sprintf('fem_simulation_%s_dt%f_without_diag.mp4', meshName, dt);
     uDataFileName = sprintf('fem_simulation_%s_dt%f_simulation_data_without_diag.mat', meshName, dt);
-    v = VideoWriter(videoFileName, 'MPEG-4');
-    open(v);
+    % v = VideoWriter(videoFileName, 'MPEG-4');
+    % open(v);
     
     for n = 1:numSteps
         % Nonlinear reaction term (explicit part)
         f = a * (u - fr) .* (u - ft) .* (u - fd); % Updated each step
         
         % Right-hand side
-        rhs = M * u - M * f * dt; % Computed using updated u and f
+        rhs = M * u -  f * dt; % Computed using updated u and f
         
         % Solve the linear system (implicit part)
-        u_new = A \ rhs; % Solve using precomputed A
+        u_tnew = A \ rhs; % Solve using precomputed A
         
         % Ensure non-negativity and upper bound of the solution
-        u_new = max(min(u_new, 1), 0);
+        u_tnew = max(min(u_tnew, 1), 0);
         
         % Check for NaN values
-        if any(isnan(u_new))
+        if any(isnan(u_tnew))
             fprintf('NaN values detected at step %d\n', n);
             break;
         end
 
         % Update u
-        u = u_new; % Updated each step
+        u = u_tnew; % Updated each step
         
         % Plot intermediate solutions every 100 time steps
         if mod(n, 10) == 0
             mesh.plotSolution(u);
-            view(3)
+            view(2)
+            axis("tight")
             title(['Solution at time step ', num2str(n)]);
             drawnow;
             % Capture the frame for the video
-            frame = getframe(gcf);
-            writeVideo(v, frame);
+            % frame = getframe(gcf);
+            % writeVideo(v, frame);
         end
 
         % Print intermediate values for debugging
@@ -121,13 +123,13 @@ function runFEMSimulation(meshFile, dt)
     % Display results
     fprintf('Results for mesh %s with dt = %f\n', meshFile, dt);
     fprintf('Activation times:\n');
-    disp(activationTimes');
+    % disp(activationTimes');
     fprintf('Potential within [0, 1]: %d\n', potentialValid);
 
     % Save the data to a .mat file
     save(uDataFileName, 'data');
-    figure; % Play the movie at 10 frames per second
+    % figure; % Play the movie at 10 frames per second
     % Close the video file
-    close(v);
+    % close(v);
 end
 
