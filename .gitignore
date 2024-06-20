@@ -1,0 +1,6 @@
+# Ignore all .mat files
+*.mat
+
+# Ignore all .mp4 files
+*.mp4
+
