@@ -5,6 +5,8 @@ To run the Finite Element Method (FEM) code, follow these steps:
 1. Change to the `FEM` directory.
 2. Execute the `main.m` script in MATLAB.
 
+![Alt Text](https://github.com/stprnvsh/SL2024USI/blob/main/FEM_sigmahx0p1.gif)
+
 ## Steps
 
 1. Open MATLAB.
@@ -27,3 +29,6 @@ In MATLAB, you can run the following commands:
 ```matlab
 cd ./FEM
 main
+
+# Running the PINN
+![Alt text](https://github.com/stprnvsh/SL2024USI/blob/main/PINN-output1.gif)
