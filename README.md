@@ -29,6 +29,7 @@ In MATLAB, you can run the following commands:
 ```matlab
 cd ./FEM
 main
+```
 
 # Running the PINN
 ![Alt text](https://github.com/stprnvsh/SL2024USI/blob/main/PINN-output1.gif)
